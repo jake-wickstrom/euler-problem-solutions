@@ -23,8 +23,8 @@ public class Power_Digit_Sum {
         return sum;
     }
         
-    private static void update(int[] digits){
-        for(int i = 0; i < 1000; i++){
+    static void update(int[] digits){
+        for(int i = 0; i < digits.length; i++){
             if(digits[i]>= 10){
                 digits[i]-=10;
                 digits[i+1]++;

@@ -7,7 +7,7 @@ import solutions.euler.problems.*;
 public class Solution_Navigator {
     
     final static int FIRST_PROBLEM_SOLVED = 13;
-    final static int LAST_PROBLEM_SOLVED = 18;
+    final static int LAST_PROBLEM_SOLVED = 21;
 
 
     public static void main(String[] args) {
@@ -42,7 +42,20 @@ public class Solution_Navigator {
                 case 18: System.out.println(Maximum_Path_Sum_I.proveBestPath("Data/Problem_18_data.txt",15));               
                          break;
                          
+                case 19: System.out.println(Counting_Sundays.getSundays());
+                         break;
+                         
+                case 20: System.out.println(Factorial_Digit_Sum.getFactorialSum());
+                         break;
+                         
+                case 21: System.out.println(Amicable_Numbers.getAmicableSum());
+                         break;
+                         
+                case 22: System.out.println(Names_Scores.getScore("Data/Problem_22_Names.txt"));
+                		 break;
+                         
                 case 67: System.out.println(Maximum_Path_Sum_I.proveBestPath("Data/Problem_67_data.txt",100));
+                         break;
             }
             if(!keepRunning){
                 chooseProblem.close();

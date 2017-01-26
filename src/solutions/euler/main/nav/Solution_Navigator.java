@@ -7,7 +7,7 @@ import solutions.euler.problems.*;
 public class Solution_Navigator {
     
     final static int FIRST_PROBLEM_SOLVED = 13;
-    final static int LAST_PROBLEM_SOLVED = 21;
+    final static int LAST_PROBLEM_SOLVED = 22;
 
 
     public static void main(String[] args) {

@@ -10,6 +10,14 @@ hands, also allowing for potentially other methods of "dealing" than from a
 text file. Certainly there is a solution to this problem that is more concise,
 but less flexible.
 
+This was also my first real experience with unit testing. Looking back, I
+probably could have avoided the Hand class having so many methods to test, as 
+all that is really important in that class is the score. My design might be a
+little too modular and requires a ton of testing as a result. The pair, triple,
+quad methods are also very similar, which was probably a bad design decision
+looking back. I can see the benefits of test driven development, and from this point forward I would expect
+to see unit testing in all of my solutions.
+
 Created on Fri Jun  8 08:08:34 2018
 
 @author: Jake Wickstrom
@@ -122,67 +130,104 @@ class Hand():
         self.values = [card.value for card in self.cards]
         self.suits = [card.suit for card in self.cards]
         
+        #sorting high to low makes getting values easier
+        #score depends on these values being sorted
+        self.values.sort()
+        self.suits.sort()
+        
     def score(self):
         """Get a score for this hand. Loses to every hand with higher score
-        according to poker rules."""
+        according to poker rules.
         
+        Codes:
+        0x90000a - straight flush (a is value of highest card)
+        0x80000a - four of a kind (a is value of quad)
+        0x7000ab - full house (a is value of trip, b of pair)
+        0x6abcde - flush (a b c d e are value of cards high to low)
+        0x50000a - straight (a is value of highest card)
+        0x400abc - three of a kind (a is value of trip, b,c others high to low)
+        0x300abc - two pair (a is high pair, b low pair, c other card)
+        0x20abcd - pair (a is pair, bcd is other cards in order)
+        0x1abcde - high card (abcde is order of cards by value)
+        """
+        values_by_duplicity = [x[0] for x in self._getDuplicity(self.values)]
+        duplicities = [x[1] for x in self._getDuplicity(self.values)]
+        is_flush = len(set(self.suits)) == 1
+        is_straight = set(range(min(values_by_duplicity),min(values_by_duplicity) + 5)) == set(self.values)
         
-        #check for flush
+        if is_flush == 1:
+            if is_straight:
+                #straight flush
+                return 0x900000 + max(self.values)
+            else:
+                #flush
+                return 0x600000 \
+                       + 0x10000*values_by_duplicity[0] \
+                       + 0x1000*values_by_duplicity[1] \
+                       + 0x100*values_by_duplicity[2] \
+                       + 0x10*values_by_duplicity[3] \
+                       + 0x1*values_by_duplicity[4]  
+                       
+        if 4 in duplicities:
+            #quads
+            return 0x800000 + self._getHexCode(values_by_duplicity)
         
-            #check for straight flush
-    
-    def checkForFlush(self):
-        """Returns true if all cards in this hand have the same suit"""
-        return len(set(self.suits)) == 1
-    
-    def checkForStraight(self):
-        """Returns true if cards in this hand all occur sequentially"""
-        low = min(self.values)
+        if 3 in duplicities:
+            if 2 in duplicities:
+                #full house
+                return 0x700000 + self._getHexCode(values_by_duplicity)
+            else:
+                #three of a kind
+                return 0x400000 + self._getHexCode(values_by_duplicity)
+            
+        if is_straight:
+            #straight
+            return 0x500000 + self._getHexCode(values_by_duplicity)
         
-        #return false if the 4 next values greater than the lowest are not
-        #present in the list
-        for i in range(5):
-            if not low + i in self.values:
-                return False
-        return True
+        if duplicities[0] == 2:
+            if duplicities[1] == 2:
+                #two pair
+                return 0x300000 + self._getHexCode(values_by_duplicity)
+            else:
+                #pair
+                return 0x200000 + self._getHexCode(values_by_duplicity)
+        
+        #high card
+        return self._getHexCode(values_by_duplicity)
     
-    def getHighCard(self):
-        """Returns the value of the highest card in the hand"""
-        return max([card.value for card in self.cards])
-    
-    def _getDuplicity(self):
-       """HELPER: Returns an semi - ordered list of tuples, where each tuple 
+    @classmethod
+    def _getHexCode(self,card_values):
+        """Returns an integer code that represents the value of a hand, by order.
+        Arguements - 
+            card_values (list(int)) - a list of the values of the cards,
+            ordered by priority. Must be at least one entry, and less than 5
+            each entry must be an integer, at least 2 and no more than 14
+            
+        Returns:
+            an integer number representing the value of this hand
+        """
+        if len(card_values) > 5 or len(card_values) < 1:
+            raise ValueError("Number of card values must be between 1 and 5")
+            
+        if max(card_values) > 14 or min(card_values) < 2:
+            raise ValueError("Card values must be between 2 and 14 (14->Ace)")
+        
+        exp = len(card_values) - 1
+        card_code = 0
+        for value in card_values:
+            card_code += (0x10**exp)*value
+            exp -= 1
+            
+        return card_code
+            
+    @classmethod
+    def _getDuplicity(self,values):
+       """Returns an ordered list of tuples, where each tuple 
           contains a value and the number of cards in the hand that have that 
           value.Ordered by the number of occurences, highest first. Order of
-          values with the same number of occurences is undefined."""
-       return Counter(self.values).most_common()
-   
-    def checkForPair(self):
-        """Returns the value of the highest pair, if it exists. Will return 0
-        if no pair is found. Checks explicitly for pairs, will not return the
-        value of 3 of a kind for example, even though there is a pair inside
-        it."""
-        
-        for potential_pair in self._getDuplicity():
-            if(potential_pair[1] == 2):
-                return potential_pair[0]
-            
-    def checkForTwoPair(self):
-        """Returns the value of the highest two pairs, if they exists. Will return 
-        0 if no pairs are found. Checks explicitly for pairs, will not return the
-        value of 3 of a kind for example, even though there is a pair inside
-        it."""
-        pairlist = []
-        for potential_pair in self._getDuplicity():
-            if(potential_pair[1] == 2):
-                pairlist.append(potential_pair[0]) 
-        
-        #sort highest to lowest        
-        pairlist.sort(reverse=True)
-                
-        return pairlist if len(pairlist) == 2 else 0
-    
-        
+          values with the same number of occurences is from greatest to least."""
+       return sorted(Counter(values).most_common(),key = lambda dupli: (dupli[1],dupli[0]),reverse=True)
+         
     
 class Match():
     """The :class:'Match' represents the matchup of one or more :class:'hand' 
@@ -199,10 +244,10 @@ class Match():
         """Returns player number of player with best hand in match."""
         pass
 
-class dealer():
+class Dealer():
     """The :class:'Dealer' provides a method of distributing cards to players"""
     
-class tournament():
+class Tournament():
     """Represents a series of poker matches between two hands"""
     def __init__(self,players,dealer):
         pass
@@ -310,82 +355,159 @@ class TestHand(unittest.TestCase):
                     Hand(cards)
                 except ValueError:
                     self.fail("Hand {} is not valid".format(cards))
-        
-    def test_is_a_flush(self):
-        royal_flush = Hand([Card("AD"),Card("KD"),Card("QD"),Card("JD"),Card("TD")])
-        straight_flush = Hand([Card("TC"),Card("9C"),Card("8C"),Card("7C"),Card("6C")])
-        random_flush = Hand([Card("6S"),Card("9S"),Card("QS"),Card("2S"),Card("4S")])
-        flushes = [royal_flush,straight_flush,random_flush]
-        
-        for flush in flushes:
-            with self.subTest():
-                self.assertTrue(flush.checkForFlush())
-            
-    def test_not_a_flush(self):
-        not_flush_1 = Hand([Card("AH"),Card("KD"),Card("QD"),Card("JD"),Card("TD")])
-        not_flush_2 = Hand([Card("AH"),Card("7C"),Card("4S"),Card("2D"),Card("3D")])
-        not_flush_3 = Hand([Card("2H"),Card("3S"),Card("4D"),Card("5C"),Card("6C")])
-        not_flushes = [not_flush_1,not_flush_2,not_flush_3]
-        
-        for hand in not_flushes:
-            with self.subTest():
-                self.assertFalse(hand.checkForFlush())
-            
-    def test_is_a_straight(self):
-        low_straight = Hand([Card("2H"),Card("3S"),Card("4D"),Card("5C"),Card("6C")])
-        royal_flush = Hand([Card("AD"),Card("KD"),Card("QD"),Card("JD"),Card("TD")])
-        straight_flush = Hand([Card("TC"),Card("9C"),Card("8C"),Card("7C"),Card("6C")])
-        unordered_straight = Hand([Card("7H"),Card("9S"),Card("6D"),Card("TC"),Card("8C")])
-        straights =  [low_straight,royal_flush,straight_flush,unordered_straight]
-        
-        for straight in straights:
-            with self.subTest():
-                self.assertTrue(straight.checkForStraight())
-                
-    def test_not_a_straight(self):
-        random_cards = Hand([Card("2H"),Card("3S"),Card("4D"),Card("TD"),Card("6C")])
-        random_flush = Hand([Card("6S"),Card("9S"),Card("QS"),Card("2S"),Card("4S")])
-        one_off = Hand([Card("AD"),Card("KD"),Card("QD"),Card("JD"),Card("9D")])
-        not_straights = [random_cards,random_flush,one_off]
-        
-        for hand in not_straights:
-            with self.subTest():
-                self.assertFalse(hand.checkForStraight())
-        
-                
-    def test_high_card(self):
-        """Tests if Hand can identify it's highest card"""
-        hand = Hand([Card("2H"),Card("3S"),Card("4D"),Card("TD"),Card("6C")])
-        self.assertEqual(hand.getHighCard(),10)
-        
-    def test_multiple_high_card(self):
-        """Tests if Hand can identify it's highest card if there are more than one"""
-        hand = Hand([Card("2H"),Card("TC"),Card("4D"),Card("TD"),Card("6C")])
-        self.assertEqual(hand.getHighCard(),10)
-                
-    def test_high_card_royal(self):
-        """Tests if hand can identify a high card above 10"""
-        hand = Hand([Card("AH"),Card("TC"),Card("4D"),Card("TD"),Card("6C")])
-        self.assertEqual(hand.getHighCard(),14)
-        
-    def test_is_a_pair(self):
-        hand = Hand([Card("2H"),Card("TC"),Card("4D"),Card("TD"),Card("6C")])
-        self.assertEqual(hand.checkForPair(),10)
-        
-    def test_three_not_a_pair(self):
-        """Tests that a three of a kind is not recognized as a pair"""
-        hand = Hand([Card("TH"),Card("TC"),Card("4D"),Card("TD"),Card("6C")])
-        self.assertFalse(hand.checkForPair())
-        
-    def test_pair_from_full_house(self):
-        """Tests that checkForPair() can extract the pair from a full house"""
-        full_house = Hand([Card("2H"),Card("TC"),Card("4D"),Card("TD"),Card("2C")])
-        self.assertEqual(full_house.checkForPair(),2)
-        
-    def test_is_two_pair(self):
-        hand = Hand([Card("6H"),Card("TC"),Card("4D"),Card("TD"),Card("6C")])
-        self.assertEqual(hand.checkForTwoPair(),[10,6])
+                    
+    def test_hex_no_cards(self):
+        self.assertRaises(ValueError,Hand._getHexCode,[])
     
+    def test_hex_one_card(self):
+        self.assertEqual(Hand._getHexCode([5]),0x5)
+    
+    def test_hex_two_cards(self):
+        self.assertEqual(Hand._getHexCode([5,2]),0x52)
+        
+    def test_hex_three_cards(self):
+        self.assertEqual(Hand._getHexCode([5,2,7]),0x527)
+        
+    def test_hex_four_cards(self):
+        self.assertEqual(Hand._getHexCode([5,2,7,3]),0x5273)
+    
+    def test_hex_five_cards(self):
+        self.assertEqual(Hand._getHexCode([5,2,7,3,6]),0x52736)
+        
+    def test_hex_too_many_cards(self):
+        self.assertRaises(ValueError,Hand._getHexCode,[5,2,7,3,6,4])
+        
+    def test_hex_value_to0_low(self):
+        self.assertRaises(ValueError,Hand._getHexCode,[5,2,7,3,1,4])
+        
+    def test_hex_value_too_high(self):
+        self.assertRaises(ValueError,Hand._getHexCode,[5,2,7,3,15,4])
+        
+    def test_duplicity_highest_occurence_is_first(self):
+        self.assertEqual(Hand._getDuplicity([1,1,3]),[(1,2),(3,1)])
+        
+    def test_duplicity_same_dup_ordered_by_val(self):
+        self.assertEqual(Hand._getDuplicity([1,1,3,3]),[(3,2),(1,2)])
+        
+    def test_duplicity_complex_test(self):
+        self.assertEqual(Hand._getDuplicity([1,1,3,3,3,8,14,2,2]),[(3,3),(2,2),(1,2),(14,1),(8,1)])
+        
+    def test_royal_ties_royal(self):
+        royal_flush = Hand([Card("AD"),Card("KD"),Card("QD"),Card("JD"),Card("TD")])
+        royal_flush_2 = Hand([Card("AH"),Card("KH"),Card("QH"),Card("JH"),Card("TH")])
+        self.assertEqual(royal_flush.score(),royal_flush_2.score())
+        
+    def test_royal_beats_straight_flush(self):
+        royal_flush = Hand([Card("AD"),Card("KD"),Card("QD"),Card("JD"),Card("TD")])
+        straight_flush = Hand([Card("TC"),Card("9C"),Card("8C"),Card("7C"),Card("6C")])
+        self.assertGreater(royal_flush.score(),straight_flush.score())
+        
+    def test_straight_flush_ties_straight_flush(self):
+        straight_flush_diamonds = Hand([Card("TD"),Card("9D"),Card("8D"),Card("7D"),Card("6D")])
+        straight_flush_clubs = Hand([Card("TC"),Card("9C"),Card("8C"),Card("7C"),Card("6C")])
+        self.assertEqual(straight_flush_diamonds.score(),straight_flush_clubs.score())
+        
+    def test_straight_flush_beats_lower_straight_flush(self):
+        straight_flush = Hand([Card("TD"),Card("9D"),Card("8D"),Card("7D"),Card("6D")])
+        straight_flush_lower = Hand([Card("5C"),Card("9C"),Card("8C"),Card("7C"),Card("6C")])
+        self.assertGreater(straight_flush.score(),straight_flush_lower.score())
+        
+    def test_straight_flush_beats_quads(self):
+        straight_flush = Hand([Card("TD"),Card("9D"),Card("8D"),Card("7D"),Card("6D")])
+        quads = Hand([Card("2H"),Card("2C"),Card("2S"),Card("2D"),Card("JC")])
+        self.assertGreater(straight_flush.score(),quads.score())
+        
+    def test_quads_beat_lower_quads(self):
+        lower_quads = Hand([Card("2H"),Card("2C"),Card("2S"),Card("2D"),Card("JC")])
+        quads = Hand([Card("AH"),Card("AC"),Card("AS"),Card("AD"),Card("JC")])
+        self.assertGreater(quads.score(),lower_quads.score())
+        
+    def test_quads_beat_lower_quads_with_higher_kicker(self):
+        lower_quads = Hand([Card("2H"),Card("2C"),Card("2S"),Card("2D"),Card("KC")])
+        quads = Hand([Card("AH"),Card("AC"),Card("AS"),Card("AD"),Card("JC")])
+        self.assertGreater(quads.score(),lower_quads.score())
+        
+    def test_quads_beat_full_house(self):
+        quads = Hand([Card("2H"),Card("2C"),Card("2S"),Card("2D"),Card("KC")])
+        full_house = Hand([Card("AH"),Card("AC"),Card("AD"),Card("KD"),Card("KH")])
+        self.assertGreater(quads.score(),full_house.score())
+        
+    def test_full_house_beats_lower_full_house(self):
+        full_house = Hand([Card("AH"),Card("AC"),Card("AD"),Card("KD"),Card("KH")])
+        full_house_2 = Hand([Card("AH"),Card("AC"),Card("AD"),Card("9D"),Card("9H")])
+        full_house_3 = Hand([Card("KH"),Card("KC"),Card("KD"),Card("TD"),Card("TH")])
+        full_house_4 = Hand([Card("4H"),Card("4C"),Card("4D"),Card("KD"),Card("KH")])
+        full_houses = [(full_house,full_house_2),(full_house_2,full_house_3),(full_house,full_house_4)]
+        
+        for houses in full_houses:
+            with self.subTest():
+                self.assertGreater(houses[0].score(),houses[1].score())
+                
+    def test_full_house_beats_flush(self):
+        full_house = Hand([Card("4H"),Card("4C"),Card("4D"),Card("KD"),Card("KH")])
+        flush = Hand([Card("6S"),Card("9S"),Card("QS"),Card("2S"),Card("4S")])
+        self.assertGreater(full_house.score(),flush.score())
+        
+    def test_flush_beats_lower_flush(self):
+        flush = Hand([Card("6S"),Card("9S"),Card("QS"),Card("2S"),Card("4S")])
+        flush_lower = Hand([Card("6H"),Card("9H"),Card("JH"),Card("2H"),Card("4H")])
+        self.assertGreater(flush.score(),flush_lower.score())
+        
+    def test_flush_beats_straight(self):
+        flush = Hand([Card("6S"),Card("9S"),Card("QS"),Card("2S"),Card("4S")])
+        straight = Hand([Card("7H"),Card("9S"),Card("6D"),Card("TC"),Card("8C")])
+        self.assertGreater(flush.score(),straight.score())
+        
+    def test_straight_beats_lower_straight(self):
+        straight = Hand([Card("7H"),Card("9S"),Card("6D"),Card("TC"),Card("8C")])
+        straight_lower = Hand([Card("7H"),Card("9S"),Card("6D"),Card("5C"),Card("8C")])
+        self.assertGreater(straight.score(),straight_lower.score())
+        
+    def test_straight_beats_trips(self):
+        straight = Hand([Card("7H"),Card("9S"),Card("6D"),Card("TC"),Card("8C")])
+        trips = Hand([Card("4H"),Card("4C"),Card("4D"),Card("KD"),Card("2H")])
+        self.assertGreater(straight.score(),trips.score())
+        
+    def test_trips_beat_lower_trips(self):
+        trips = Hand([Card("9H"),Card("9C"),Card("9D"),Card("KD"),Card("2H")])
+        trips_lower = Hand([Card("4H"),Card("4C"),Card("4D"),Card("KD"),Card("2H")])
+        self.assertGreater(trips.score(),trips_lower.score())
+        
+    def test_trips_beat_two_pair(self):
+        trips = Hand([Card("9H"),Card("9C"),Card("9D"),Card("KD"),Card("2H")])
+        two_pair = Hand([Card("9H"),Card("9C"),Card("8D"),Card("2D"),Card("2H")])
+        self.assertGreater(trips.score(),two_pair.score())
+        
+    def test_two_pair_beats_lower_two_pair(self):
+        two_pair = Hand([Card("9H"),Card("9C"),Card("8D"),Card("7D"),Card("7H")])
+        two_pair_lower = Hand([Card("9H"),Card("9C"),Card("8D"),Card("2D"),Card("2H")])
+        two_pair_even_lower = Hand([Card("6H"),Card("6C"),Card("8D"),Card("4D"),Card("4H")])
+        two_pair_lowest = Hand([Card("5H"),Card("5C"),Card("8D"),Card("4D"),Card("4H")])
+        hands = [(two_pair,two_pair_lower),(two_pair_lower,two_pair_even_lower),(two_pair_even_lower,two_pair_lowest)]
+        
+        for matchup in hands:
+            self.assertGreater(matchup[0].score(),matchup[1].score())
+            
+    def test_two_pair_beats_pair(self):
+        two_pair = Hand([Card("9H"),Card("9C"),Card("8D"),Card("7D"),Card("7H")])
+        pair = Hand([Card("9H"),Card("9C"),Card("8D"),Card("7D"),Card("6H")])
+        self.assertGreater(two_pair.score(),pair.score())
+        
+    def test_pair_beats_lower_pair(self):
+        pair = Hand([Card("9H"),Card("9C"),Card("8D"),Card("7D"),Card("6H")])
+        pair_lower = Hand([Card("8H"),Card("8C"),Card("AD"),Card("7D"),Card("6H")])
+        self.assertGreater(pair.score(),pair_lower.score())
+        
+    def test_pair_beats_high_card(self):
+        pair = Hand([Card("9H"),Card("9C"),Card("8D"),Card("7D"),Card("6H")])
+        high_card = Hand([Card("9H"),Card("KC"),Card("8D"),Card("7D"),Card("6H")])
+        self.assertGreater(pair.score(),high_card.score())
+        
+    def test_high_card_beats_lower_high_card(self):
+        high_card = Hand([Card("9H"),Card("KC"),Card("8D"),Card("7D"),Card("6H")])
+        high_card_lower = Hand([Card("9H"),Card("JC"),Card("8D"),Card("7D"),Card("6H")])
+        self.assertGreater(high_card.score(),high_card_lower.score())
+        
 if __name__ == "__main__":
-    unittest.main(exit=False,verbosity=2)
+    unittest.main(exit=False,verbosity=3)
     

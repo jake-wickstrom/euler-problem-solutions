@@ -23,8 +23,13 @@ Created on Fri Jun  8 08:08:34 2018
 @author: Jake Wickstrom
 """
 import unittest
+import unittest.mock as mock
 import itertools
+import abc
+import re
+import io
 from collections import Counter
+
 
 class Card():
     """A standard playing card
@@ -227,30 +232,63 @@ class Hand():
           value.Ordered by the number of occurences, highest first. Order of
           values with the same number of occurences is from greatest to least."""
        return sorted(Counter(values).most_common(),key = lambda dupli: (dupli[1],dupli[0]),reverse=True)
-         
-    
-class Match():
-    """The :class:'Match' represents the matchup of one or more :class:'hand' 
-    objects. All instances of :class:'Hand' must belong to a different :class:
-    'Player'.
-    Args:
-        hands - an ordered list of :class:'Hand' objects. No two hands in the same match
-        are permitted to have the same :class:'Card'
-        """
-    def __init__(self,hands):
-        pass
-    
-    def showdown(self):
-        """Returns player number of player with best hand in match."""
-        pass
-
-class Dealer():
-    """The :class:'Dealer' provides a method of distributing cards to players"""
     
 class Tournament():
     """Represents a series of poker matches between two hands"""
-    def __init__(self,players,dealer):
+    __metaclass__ = abc.ABCMeta
+    def __init__(self):
         pass
+    
+    @abc.abstractmethod
+    def run(self):
+        """Run a tournament and return the winner"""
+        pass
+    
+class TextFileTournamentCreator():
+    def createTournament(self,players,matchups):
+        pass
+    
+class ClassicTournamentFromTextFile(Tournament):
+    """A classic poker style tournament from a formatted text file. Each line of
+    the file contains a group of hands (between 2 and 10), with each hand
+    consisting of 5 tokens which indicate the card in question. All hands are
+    assumed to be valid, and it is assumed there are no ties."""
+    def __init__(self,file):
+        self.matchups = []
+        self.handRegex = re.compile(r"(?:[\dTJQKA][CDHS] *?){5}")
+        try:
+            with open(file) as tournament_txt:
+                for matchup in tournament_txt:
+                    raw_hands = self.handRegex.findall(matchup)
+                    #break up matchup into hands, then for each hand create
+                    #individual cards and place them in a Hand object
+                    self.matchups.append([Hand([Card(x) for x in raw_cards.split()]) for raw_cards in raw_hands])
+        except FileNotFoundError:
+            print("The provided file does not exist. Program terminating.")
+            exit()
+    
+                
+    def run(self):
+        total_wins = {}
+        for matchup in self.matchups:
+            scores = []
+            for hand in matchup:
+                scores.append(hand.score())
+            if scores.count(max(scores)) > 1:
+                
+                try:  
+                    total_wins["Draws"] += 1
+                except KeyError:
+                    total_wins["Draws"] = 1
+            else:
+                try:
+                    total_wins[scores.index(max(scores))] += 1
+                except KeyError:
+                    total_wins[scores.index(max(scores))] = 1
+                
+        return total_wins
+            
+                
     
 class TestHelpers():
     
@@ -507,7 +545,16 @@ class TestHand(unittest.TestCase):
         high_card = Hand([Card("9H"),Card("KC"),Card("8D"),Card("7D"),Card("6H")])
         high_card_lower = Hand([Card("9H"),Card("JC"),Card("8D"),Card("7D"),Card("6H")])
         self.assertGreater(high_card.score(),high_card_lower.score())
+
+class TestClassicTournamentFromTextFile(unittest.TestCase):
+    def system_test_gets_correct_value(self):
+        """Value verified on projecteuler.net, verifies that further implimentation
+        changes still get right answer"""
+        tournament = ClassicTournamentFromTextFile("..\\Data\\Problem_54_Data.txt")
+        self.assertEqual(tournament.run(),{0:376,1:624})
         
 if __name__ == "__main__":
-    unittest.main(exit=False,verbosity=3)
-    
+    unittest.main(exit=False)
+    tournament = ClassicTournamentFromTextFile("..\\Data\\Problem_54_Data.txt")
+    results = tournament.run()
+    print("\nPlayer 1: {}\nPlayer 2: {}".format(results[0],results[1]))

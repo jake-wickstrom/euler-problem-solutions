@@ -92,6 +92,10 @@ class Card():
         else:
             return int(self.value_code)
         
+    @property
+    def name(self):
+        return self.__str__()
+    
     def __str__(self):
         return self.inv_values[self.values[self.value_code]] \
                 + self.inv_suits[self.suits[self.suit_code]]
@@ -110,11 +114,23 @@ class Card():
     def __hash__(self):
         return self.suits[self.suit_code] + self.values[self.value_code]
     
-class Player():
-    """The :class:'Player' represents a poker player
-    Args:
-        player_id - a unique identifier for this player"""
-    def __init__(self,player_id):
+class Deck():
+    """The :class:'Deck' represents a deck of cards and provides methods for
+    interacting with a deck."""
+    def __init__(self):
+        self._fullDeck = []
+        for suit in Card.suits.keys():
+            for value in Card.values.keys():
+                self._fullDeck.append(Card(suit + value))
+                
+    def draw(self):
+        """'Draws' a card from the deck and returns it. It will not be possible
+        to draw this card again until this deck is reshuffled."""
+        pass
+    
+    def reshuffle(self):
+        """Reshuffles all cards back into the deck, allowing them to be drawn
+        again."""
         pass
     
     
@@ -365,6 +381,12 @@ class CardTest(unittest.TestCase):
                         Card(value + suit)
                     except ValueError:
                         self.fail("Card {} is not valid".format(value + suit))
+                        
+    def test_name(self):
+        for value in self.string_values:
+            for suit in self.suits:
+                with self.subTest(msg="Checking {}{}".format(value,suit)):
+                    self.assertEqual(Card(value + suit).name,value+suit)
                         
     def test_valid_list_inputs(self):
         #test all cards in a deck given as lists
